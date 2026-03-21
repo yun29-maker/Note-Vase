@@ -3,6 +3,9 @@
 import { useState } from "react";
 
 export default function Home() {
+  const [clientName, setClientName] = useState("");
+  const [siteAddress, setSiteAddress] = useState("");
+  const [projectType, setProjectType] = useState("renovation");
   const [typeEmetteur, setTypeEmetteur] = useState("radiateurs");
   const [puissance, setPuissance] = useState("");
   const [volume, setVolume] = useState("");
@@ -73,6 +76,10 @@ export default function Home() {
     const volumeRecommande = volumesStandards.find((v) => v >= Vn) || "hors plage standard";
 
     setResultat({
+      clientName,
+      siteAddress,
+      projectType,
+      typeEmetteur,
       origineVolume,
       Va: Va.toFixed(1),
       Pst: Pst.toFixed(2),
@@ -120,7 +127,43 @@ export default function Home() {
             boxShadow: "0 2px 10px rgba(0,0,0,0.05)",
           }}
         >
-          <h2 style={{ marginTop: 0 }}>Calculateur de vase d’expansion</h2>
+          <h2 style={{ marginTop: 0 }}>Informations chantier</h2>
+
+          <div style={{ display: "grid", gap: 16 }}>
+            <div>
+              <label>Nom du client</label>
+              <input
+                type="text"
+                value={clientName}
+                onChange={(e) => setClientName(e.target.value)}
+                style={inputStyle}
+              />
+            </div>
+
+            <div>
+              <label>Adresse du chantier</label>
+              <input
+                type="text"
+                value={siteAddress}
+                onChange={(e) => setSiteAddress(e.target.value)}
+                style={inputStyle}
+              />
+            </div>
+
+            <div>
+              <label>Type de projet</label>
+              <select
+                value={projectType}
+                onChange={(e) => setProjectType(e.target.value)}
+                style={inputStyle}
+              >
+                <option value="renovation">Rénovation</option>
+                <option value="neuf">Neuf</option>
+              </select>
+            </div>
+          </div>
+
+          <h2 style={{ marginTop: 32 }}>Calculateur de vase d’expansion</h2>
 
           <div style={{ display: "grid", gap: 16 }}>
             <div>
@@ -214,6 +257,11 @@ export default function Home() {
               }}
             >
               <h2 style={{ marginTop: 0 }}>Résultat</h2>
+
+              <p><strong>Client :</strong> {resultat.clientName || "Non renseigné"}</p>
+              <p><strong>Adresse :</strong> {resultat.siteAddress || "Non renseignée"}</p>
+              <p><strong>Type de projet :</strong> {resultat.projectType}</p>
+              <p><strong>Type d’émetteur :</strong> {resultat.typeEmetteur}</p>
               <p><strong>Origine du volume :</strong> {resultat.origineVolume}</p>
               <p><strong>Volume installation retenu :</strong> {resultat.Va} L</p>
               <p><strong>Pression statique :</strong> {resultat.Pst} bar</p>
