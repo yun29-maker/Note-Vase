@@ -1,5 +1,5 @@
 export const metadata = {
-  title: "NotePAC",
+  title: "NoteVase",
   description: "Calcul de vase d'expansion",
 };
 
