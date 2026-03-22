@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { supabase } from "../lib/supabase";
 
 export default function Home() {
   const [clientName, setClientName] = useState("");
@@ -14,9 +15,11 @@ export default function Home() {
   const [soupape, setSoupape] = useState("");
   const [resultat, setResultat] = useState(null);
   const [erreur, setErreur] = useState("");
+  const [message, setMessage] = useState("");
 
   function calculer() {
     setErreur("");
+    setMessage("");
     setResultat(null);
 
     const puissanceNum = parseFloat(puissance);
@@ -73,23 +76,98 @@ export default function Home() {
     const Vn = Ve / (1 - Pa / Pe);
 
     const volumesStandards = [8, 12, 18, 25, 35, 50, 80, 100, 140, 200, 250, 300, 400, 500, 600];
-    const volumeRecommande = volumesStandards.find((v) => v >= Vn) || "hors plage standard";
+    const volumeRecommande = volumesStandards.find((v) => v >= Vn) || null;
 
     setResultat({
       clientName,
       siteAddress,
       projectType,
       typeEmetteur,
+      puissance_generateur_kw: puissanceNum,
+      volume_installation_l: !isNaN(volumeNum) && volumeNum > 0 ? volumeNum : null,
+      temperature_maxi_c: temperatureNum,
+      hauteur_statique_m: hauteurNum,
+      pression_soupape_bar: soupapeNum,
       origineVolume,
-      Va: Va.toFixed(1),
-      Pst: Pst.toFixed(2),
-      P0: P0.toFixed(2),
-      Per: Per.toFixed(2),
-      e: e.toFixed(4),
-      Ve: Ve.toFixed(2),
-      Vn: Vn.toFixed(2),
+      Va: Number(Va.toFixed(1)),
+      Pst: Number(Pst.toFixed(2)),
+      P0: Number(P0.toFixed(2)),
+      Per: Number(Per.toFixed(2)),
+      Pa: Number(Pa.toFixed(2)),
+      Pe: Number(Pe.toFixed(2)),
+      n: Number(n.toFixed(3)),
+      e: Number(e.toFixed(4)),
+      Ve: Number(Ve.toFixed(2)),
+      Vn: Number(Vn.toFixed(2)),
       volumeRecommande,
     });
+  }
+
+  async function enregistrerEtude() {
+    if (!resultat) {
+      setErreur("Veuillez d’abord faire le calcul.");
+      return;
+    }
+
+    setErreur("");
+    setMessage("");
+
+    const fakeUserId = crypto.randomUUID();
+
+    const { data: project, error: projectError } = await supabase
+      .from("projects")
+      .insert([
+        {
+          user_id: fakeUserId,
+          client_name: resultat.clientName || null,
+          site_address: resultat.siteAddress || null,
+          project_type: resultat.projectType,
+          type_emetteur: resultat.typeEmetteur,
+          puissance_generateur_kw: resultat.puissance_generateur_kw,
+          volume_installation_l: resultat.volume_installation_l,
+          temperature_maxi_c: resultat.temperature_maxi_c,
+          hauteur_statique_m: resultat.hauteur_statique_m,
+          pression_soupape_bar: resultat.pression_soupape_bar,
+          glycol_pourcent: 0,
+          status: "calculated",
+        },
+      ])
+      .select()
+      .single();
+
+    if (projectError) {
+      setErreur("Erreur lors de l’enregistrement du projet.");
+      return;
+    }
+
+    const { error: calculationError } = await supabase
+      .from("calculations")
+      .insert([
+        {
+          project_id: project.id,
+          origine_volume: resultat.origineVolume,
+          va_l: resultat.Va,
+          pst_bar: resultat.Pst,
+          p0_bar: resultat.P0,
+          per_bar: resultat.Per,
+          pa_bar: resultat.Pa,
+          pe_bar: resultat.Pe,
+          n_value: resultat.n,
+          e_value: resultat.e,
+          ve_l: resultat.Ve,
+          vn_l: resultat.Vn,
+          volume_recommande_l: resultat.volumeRecommande,
+          success: true,
+          message: "Calcul réalisé avec succès.",
+        },
+      ]);
+
+    if (calculationError) {
+      setErreur("Projet enregistré, mais erreur lors de l’enregistrement du calcul.");
+      return;
+    }
+
+    setMessage("Étude enregistrée avec succès dans la base.");
   }
 
   return (
@@ -112,7 +190,7 @@ export default function Home() {
             marginBottom: 24,
           }}
         >
-          <h1 style={{ marginTop: 0 }}>NoteVase</h1>
+          <h1 style={{ marginTop: 0 }}>NotePAC</h1>
           <p style={{ fontSize: 18, lineHeight: 1.6 }}>
             Faites votre étude gratuitement, visualisez le résultat immédiatement,
             puis payez seulement 2,50 € pour obtenir le PDF.
@@ -132,31 +210,17 @@ export default function Home() {
           <div style={{ display: "grid", gap: 16 }}>
             <div>
               <label>Nom du client</label>
-              <input
-                type="text"
-                value={clientName}
-                onChange={(e) => setClientName(e.target.value)}
-                style={inputStyle}
-              />
+              <input type="text" value={clientName} onChange={(e) => setClientName(e.target.value)} style={inputStyle} />
             </div>
 
             <div>
               <label>Adresse du chantier</label>
-              <input
-                type="text"
-                value={siteAddress}
-                onChange={(e) => setSiteAddress(e.target.value)}
-                style={inputStyle}
-              />
+              <input type="text" value={siteAddress} onChange={(e) => setSiteAddress(e.target.value)} style={inputStyle} />
             </div>
 
             <div>
               <label>Type de projet</label>
-              <select
-                value={projectType}
-                onChange={(e) => setProjectType(e.target.value)}
-                style={inputStyle}
-              >
+              <select value={projectType} onChange={(e) => setProjectType(e.target.value)} style={inputStyle}>
                 <option value="renovation">Rénovation</option>
                 <option value="neuf">Neuf</option>
               </select>
@@ -168,11 +232,7 @@ export default function Home() {
           <div style={{ display: "grid", gap: 16 }}>
             <div>
               <label>Type d’émetteur</label>
-              <select
-                value={typeEmetteur}
-                onChange={(e) => setTypeEmetteur(e.target.value)}
-                style={inputStyle}
-              >
+              <select value={typeEmetteur} onChange={(e) => setTypeEmetteur(e.target.value)} style={inputStyle}>
                 <option value="radiateurs">Radiateurs</option>
                 <option value="plancher_chauffant">Plancher chauffant</option>
               </select>
@@ -180,52 +240,27 @@ export default function Home() {
 
             <div>
               <label>Puissance du générateur (kW)</label>
-              <input
-                type="number"
-                value={puissance}
-                onChange={(e) => setPuissance(e.target.value)}
-                style={inputStyle}
-              />
+              <input type="number" value={puissance} onChange={(e) => setPuissance(e.target.value)} style={inputStyle} />
             </div>
 
             <div>
               <label>Volume d’eau installation (L) si connu</label>
-              <input
-                type="number"
-                value={volume}
-                onChange={(e) => setVolume(e.target.value)}
-                style={inputStyle}
-              />
+              <input type="number" value={volume} onChange={(e) => setVolume(e.target.value)} style={inputStyle} />
             </div>
 
             <div>
               <label>Température maxi (°C)</label>
-              <input
-                type="number"
-                value={temperature}
-                onChange={(e) => setTemperature(e.target.value)}
-                style={inputStyle}
-              />
+              <input type="number" value={temperature} onChange={(e) => setTemperature(e.target.value)} style={inputStyle} />
             </div>
 
             <div>
               <label>Hauteur statique (m)</label>
-              <input
-                type="number"
-                value={hauteur}
-                onChange={(e) => setHauteur(e.target.value)}
-                style={inputStyle}
-              />
+              <input type="number" value={hauteur} onChange={(e) => setHauteur(e.target.value)} style={inputStyle} />
             </div>
 
             <div>
               <label>Pression soupape (bar)</label>
-              <input
-                type="number"
-                value={soupape}
-                onChange={(e) => setSoupape(e.target.value)}
-                style={inputStyle}
-              />
+              <input type="number" value={soupape} onChange={(e) => setSoupape(e.target.value)} style={inputStyle} />
             </div>
           </div>
 
@@ -234,28 +269,19 @@ export default function Home() {
           </button>
 
           {erreur ? (
-            <div
-              style={{
-                marginTop: 20,
-                background: "#fee2e2",
-                color: "#991b1b",
-                padding: 16,
-                borderRadius: 12,
-              }}
-            >
+            <div style={{ marginTop: 20, background: "#fee2e2", color: "#991b1b", padding: 16, borderRadius: 12 }}>
               {erreur}
             </div>
           ) : null}
 
+          {message ? (
+            <div style={{ marginTop: 20, background: "#dcfce7", color: "#166534", padding: 16, borderRadius: 12 }}>
+              {message}
+            </div>
+          ) : null}
+
           {resultat ? (
-            <div
-              style={{
-                marginTop: 24,
-                background: "#ecfeff",
-                borderRadius: 16,
-                padding: 24,
-              }}
-            >
+            <div style={{ marginTop: 24, background: "#ecfeff", borderRadius: 16, padding: 24 }}>
               <h2 style={{ marginTop: 0 }}>Résultat</h2>
 
               <p><strong>Client :</strong> {resultat.clientName || "Non renseigné"}</p>
@@ -271,26 +297,17 @@ export default function Home() {
               <p><strong>Volume d’expansion :</strong> {resultat.Ve} L</p>
               <p><strong>Volume minimal du vase :</strong> {resultat.Vn} L</p>
 
-              <div
-                style={{
-                  marginTop: 16,
-                  fontSize: 28,
-                  fontWeight: "bold",
-                }}
-              >
-                Volume recommandé : {resultat.volumeRecommande} L
+              <div style={{ marginTop: 16, fontSize: 28, fontWeight: "bold" }}>
+                Volume recommandé : {resultat.volumeRecommande ?? "hors plage standard"} L
               </div>
 
-              <div
-                style={{
-                  marginTop: 20,
-                  padding: 16,
-                  borderRadius: 12,
-                  background: "#fff7ed",
-                }}
-              >
+              <div style={{ marginTop: 20, padding: 16, borderRadius: 12, background: "#fff7ed" }}>
                 Pour obtenir la note PDF, l’utilisateur paiera 2,50 € à la fin.
               </div>
+
+              <button onClick={enregistrerEtude} style={buttonStyle}>
+                Enregistrer l’étude
+              </button>
             </div>
           ) : null}
         </div>
