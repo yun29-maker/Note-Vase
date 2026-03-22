@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
+import AuthForm from "./auth-form";
 
 export default function Home() {
+  const [user, setUser] = useState(null);
   const [clientName, setClientName] = useState("");
   const [siteAddress, setSiteAddress] = useState("");
   const [projectType, setProjectType] = useState("renovation");
@@ -16,6 +18,25 @@ export default function Home() {
   const [resultat, setResultat] = useState(null);
   const [erreur, setErreur] = useState("");
   const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    async function loadUser() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      setUser(user || null);
+    }
+
+    loadUser();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user || null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   function calculer() {
     setErreur("");
@@ -109,16 +130,19 @@ export default function Home() {
       return;
     }
 
+    if (!user) {
+      setErreur("Veuillez vous connecter pour enregistrer l’étude.");
+      return;
+    }
+
     setErreur("");
     setMessage("");
-
-    const fakeUserId = crypto.randomUUID();
 
     const { data: project, error: projectError } = await supabase
       .from("projects")
       .insert([
         {
-          user_id: fakeUserId,
+          user_id: user.id,
           client_name: resultat.clientName || null,
           site_address: resultat.siteAddress || null,
           project_type: resultat.projectType,
@@ -167,7 +191,12 @@ export default function Home() {
       return;
     }
 
-    setMessage("Étude enregistrée avec succès dans la base.");
+    setMessage("Étude enregistrée avec succès dans votre compte.");
+  }
+
+  async function seDeconnecter() {
+    await supabase.auth.signOut();
+    setMessage("Déconnexion réussie.");
   }
 
   return (
@@ -195,7 +224,18 @@ export default function Home() {
             Faites votre étude gratuitement, visualisez le résultat immédiatement,
             puis payez seulement 2,50 € pour obtenir le PDF.
           </p>
+
+          {user ? (
+            <div style={{ marginTop: 16 }}>
+              Connecté : <strong>{user.email}</strong>
+              <button onClick={seDeconnecter} style={{ ...buttonStyle, marginTop: 12 }}>
+                Se déconnecter
+              </button>
+            </div>
+          ) : null}
         </div>
+
+        {!user ? <AuthForm onAuthSuccess={() => setMessage("Connexion réussie.")} /> : null}
 
         <div
           style={{
