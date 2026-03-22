@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { jsPDF } from "jspdf";
 import { supabase } from "../lib/supabase";
 import AuthForm from "./auth-form";
 
@@ -194,6 +195,105 @@ export default function Home() {
     setMessage("Étude enregistrée avec succès dans votre compte.");
   }
 
+  function genererPdfTest() {
+    if (!resultat) {
+      setErreur("Veuillez d’abord faire le calcul.");
+      return;
+    }
+
+    const doc = new jsPDF();
+    let y = 20;
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.text("Note de dimensionnement du vase d'expansion", 14, y);
+
+    y += 10;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(11);
+    doc.text(`Date : ${new Date().toLocaleDateString("fr-FR")}`, 14, y);
+
+    y += 12;
+    doc.setFont("helvetica", "bold");
+    doc.text("Informations chantier", 14, y);
+
+    y += 8;
+    doc.setFont("helvetica", "normal");
+    doc.text(`Client : ${resultat.clientName || "Non renseigne"}`, 14, y);
+    y += 7;
+    doc.text(`Adresse : ${resultat.siteAddress || "Non renseignee"}`, 14, y);
+    y += 7;
+    doc.text(`Type de projet : ${resultat.projectType}`, 14, y);
+
+    y += 12;
+    doc.setFont("helvetica", "bold");
+    doc.text("Donnees de calcul", 14, y);
+
+    y += 8;
+    doc.setFont("helvetica", "normal");
+    doc.text(`Type d'emetteur : ${resultat.typeEmetteur}`, 14, y);
+    y += 7;
+    doc.text(`Puissance generateur : ${resultat.puissance_generateur_kw} kW`, 14, y);
+    y += 7;
+    doc.text(`Volume installation retenu : ${resultat.Va} L`, 14, y);
+    y += 7;
+    doc.text(`Origine du volume : ${resultat.origineVolume}`, 14, y);
+    y += 7;
+    doc.text(`Temperature maxi : ${resultat.temperature_maxi_c} °C`, 14, y);
+    y += 7;
+    doc.text(`Hauteur statique : ${resultat.hauteur_statique_m} m`, 14, y);
+    y += 7;
+    doc.text(`Pression soupape : ${resultat.pression_soupape_bar} bar`, 14, y);
+
+    y += 12;
+    doc.setFont("helvetica", "bold");
+    doc.text("Resultats", 14, y);
+
+    y += 8;
+    doc.setFont("helvetica", "normal");
+    doc.text(`Pression statique : ${resultat.Pst} bar`, 14, y);
+    y += 7;
+    doc.text(`Pression initiale : ${resultat.P0} bar`, 14, y);
+    y += 7;
+    doc.text(`Pression max d'exercice : ${resultat.Per} bar`, 14, y);
+    y += 7;
+    doc.text(`Coefficient d'expansion : ${resultat.e}`, 14, y);
+    y += 7;
+    doc.text(`Volume d'expansion : ${resultat.Ve} L`, 14, y);
+    y += 7;
+    doc.text(`Volume minimal du vase : ${resultat.Vn} L`, 14, y);
+
+    y += 10;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.text(
+      `Volume recommande : ${resultat.volumeRecommande ?? "hors plage standard"} L`,
+      14,
+      y
+    );
+
+    y += 14;
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(
+      "Cette note est etablie a partir des donnees saisies par l'utilisateur.",
+      14,
+      y
+    );
+    y += 6;
+    doc.text(
+      "Lorsque le volume d'eau n'est pas renseigne, il est estime selon une methode simplifiee.",
+      14,
+      y
+    );
+
+    const nomFichier = `note-vase-${(resultat.clientName || "chantier")
+      .toLowerCase()
+      .replace(/\s+/g, "-")}.pdf`;
+
+    doc.save(nomFichier);
+  }
+
   async function seDeconnecter() {
     await supabase.auth.signOut();
     setMessage("Déconnexion réussie.");
@@ -348,6 +448,10 @@ export default function Home() {
               <button onClick={enregistrerEtude} style={buttonStyle}>
                 Enregistrer l’étude
               </button>
+
+              <button onClick={genererPdfTest} style={secondaryButtonStyle}>
+                Télécharger un PDF de test
+              </button>
             </div>
           ) : null}
         </div>
@@ -373,6 +477,18 @@ const buttonStyle = {
   border: "none",
   background: "#0f172a",
   color: "white",
+  fontWeight: "bold",
+  cursor: "pointer",
+};
+
+const secondaryButtonStyle = {
+  marginTop: 12,
+  width: "100%",
+  padding: 14,
+  borderRadius: 12,
+  border: "1px solid #cbd5e1",
+  background: "white",
+  color: "#0f172a",
   fontWeight: "bold",
   cursor: "pointer",
 };
